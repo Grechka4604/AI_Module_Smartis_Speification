@@ -1,0 +1,28 @@
+@startuml
+title Ежедневная синхронизация рекомендаций
+
+participant Backend as back
+participant MySQL as db
+
+activate back
+back -> db: Планировщик создаёт задачи (ai_recommendations_by_placements_queue)
+activate db
+db --> back: OK
+deactivate db
+
+back -> db: Запрос списка актуальных задач (status=pending, date=current_date)
+activate db
+db --> back: Список задач (client_id, date)
+deactivate db
+
+loop Запуск pipeline для каждого client_id
+  back -> back: Job-runner запускает pipeline module
+end
+
+back -> db: Сохранение рекомендаций
+activate db
+db --> back: OK
+deactivate db
+deactivate back
+
+@enduml

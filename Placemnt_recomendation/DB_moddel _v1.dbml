@@ -1,0 +1,39 @@
+
+
+// Касаемо этой таблицы много вопросов, надо бы с Игорем обсудить 
+// Как по мне есть избыточности(если мы хотим версионности), и не до конца понятен подход к заполнению
+Table ai_recommendations_by_placements {
+  id TYPE
+  client_id TYPE
+  channel_id TYPE
+  placement_id TYPE
+  date_from TYPE
+  date_to TYPE
+  recomendation TYPE
+  recomendation_detail TYPE
+  promt_description_id TYPE [ref: - promt_description.id]
+  created_at TYPE
+  is_validate TYPE
+}
+// unique_key = client_id + chanel_id + placement_id + recomendation 
+
+
+Table ai_recommendations_by_placements_queue {
+  id TYPE
+  date TYPE
+  client_id TYPE
+  status TYPE
+  started_at TYPE
+  finished_at TYPE
+  promt_description_id TYPE [ref: - promt_description.id]
+}
+
+Table promt_description {
+  id TYPE
+  request_text TYPE
+  response_text TYPE
+  created_at TYPE
+}
+
+
+

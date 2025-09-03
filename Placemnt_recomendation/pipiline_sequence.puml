@@ -1,0 +1,106 @@
+@startuml
+
+title оо
+
+participant "Backend(job_runner)" as back_jr
+participant "Backend(report_builder)" as back_rb
+participant "Backend(promt_builder)" as back_pc
+participant "Backend(LLM_module)" as back_lm
+participant "Backend(response_validator)" as back_rv
+participant "Backend(store)" as back_s
+participant MySQL as db
+participant "LLM Gateway" as gw
+participant LLM as llm
+participant Redis as redis
+
+activate back_jr
+back_jr -> back_jr: Инициализация и запуск pipeline
+back_jr -> back_rb: Вызов построителя с нужными параметрами
+activate back_rb
+back_rb -> db: Запрос данных для отчета
+activate db
+db --> back_rb: Получение данных для построения
+deactivate db
+back_rb -> back_rb: Формирование JSON
+back_rb -> db: Обновляем статус в очереди (ai_recommendations_by_placements_queue)
+activate db
+db --> back_rb: OK
+deactivate db
+back_rb -> back_pc: Передает JSON
+deactivate back_rb
+
+activate back_pc
+back_pc -> back_pc: Парсинг JSON и формирование промта
+back_pc -> db: Обновляем статус в очереди (ai_recommendations_by_placements_queue)
+activate db
+db --> back_pc: OK
+deactivate db
+back_pc -> redis: Добавление задачи на запрос к LLM
+activate redis
+redis --> back_pc: OK
+deactivate redis
+deactivate back_pc
+
+back_lm -> redis: Берем задачу из очереди
+activate back_lm
+activate redis
+redis --> back_lm: JSON-задача
+deactivate redis
+
+back_lm -> gw: Отправляем API запрос
+activate gw
+gw -> llm: Обращаемся в LLM
+activate llm
+llm -> llm: Формирование ответа
+llm --> gw: Ответ
+deactivate llm
+gw --> back_lm: Ответ
+deactivate gw
+
+back_lm -> redis: Обновляем статус задачи и добавляем ответ
+activate redis
+redis --> back_lm: OK
+deactivate redis
+deactivate back_lm
+
+back_pc -> redis: Получаем ответ
+activate redis
+redis --> back_pc: Ответ
+deactivate redis
+
+activate back_pc
+back_pc -> db: Обновляем статус в очереди (ai_recommendations_by_placements_queue)
+activate db
+db --> back_pc: OK
+deactivate db
+back_pc -> back_rv: Отправляем ответ
+deactivate back_pc
+
+activate back_rv
+back_rv -> back_rv: Проверка ответа на валидность и нормализация
+back_rv -> back_s: Отправляем валидный и нормализованный ответ
+deactivate back_rv
+
+activate back_s
+back_s -> db: Сохранение ответа в таблицу promt_description
+activate db
+db --> back_s: OK
+deactivate db
+
+back_s -> db: Сохранение ответа в таблицу ai_recommendations_by_placements
+activate db
+db --> back_s: OK
+deactivate db
+deactivate back_s
+
+note right
+    Тут у нас таблица версионная
+    надо для начала выяснить логику ее заполнения
+    сейчас вижу такой вариант
+    - Сохраняем всегда
+    - Вешаем ограничение на уникальность по ключу (его описал в модели данных)
+    - Триггер на сохранение (если занесли запись то и предыдущей обновить date_to)
+end note
+
+deactivate back_jr
+@enduml
